@@ -84,6 +84,65 @@ var Engine = function() {
         x x x x x x x x x x x
     */
 
+    // board array
+    var board = new Array(11 * 14);
+
+    // side to move
+    var side = RED;
+
+    // sixty moves draw rule
+    var sixty = 0;
+
+    // king position
+    var kingSquare = [0, 0];
+
+    // reset board array & game state
+    function resetBoard() {
+        // reset board position
+        for (let rank = 0; rank < 14; rank++) {
+            for (let file = 0; file < 11; file++) {
+                let square = rank * 11 + file;
+
+                if (COORDINATES[square] != 'xx') board[square] = EMPTY;
+                else board[square] = OFFBOARD;
+            }
+        }
+
+        // reset game state
+        sid = RED;
+        sixty = 0;
+        kingSquare = [0, 0];
+    }
+
+    // print board
+    const asciiPieces = ['.', 'P', 'A', 'E', 'H', 'C', 'R', 'K', 'p', 'a', 'e', 'h', 'c', 'r', 'k'];
+
+    function printBoard() {
+        let boardString = '';
+
+        // print board position
+        for (let rank = 0; rank < 14; rank++) {
+            for (let file = 0; file < 11; file++) {
+                let square = rank * 11 + file;
+
+                if (COORDINATES[square] != 'xx') {
+                    if (file == 1) boardString += 11 - rank + '  ';
+                    boardString += asciiPieces[board[square]] + ' ';
+                };
+            }
+
+            if (rank < 13) boardString +=  '\n';
+        }
+        boardString += '   a b c d e f g h i';
+        console.log(boardString);
+    }
+
+    // init Game
+    (function initAll() {
+        console.log("Init all");
+    }());
+
+
     // debug
     function debug() {
         console.log(a9);
@@ -91,6 +150,15 @@ var Engine = function() {
 
         console.log(i0);
         console.log(COORDINATES[i0]);
+
+        resetBoard();
+
+        board[a9] = BLACK_ROOK;
+        board[i9] = BLACK_ROOK;
+        board[a0] = RED_ROOK;
+        board[i0] = RED_ROOK;
+
+        printBoard();
     }
 
     return {
