@@ -109,14 +109,72 @@ var Engine = function() {
         }
 
         // reset game state
-        sid = RED;
+        side = RED;
         sixty = 0;
         kingSquare = [0, 0];
     }
 
-    // print board
+    // encode string to pieces
+    const charPieces = {
+        'P': RED_PAWN,
+        'A': RED_ADVISOR,
+        'E': RED_ELEPHANT,
+        'H': RED_HORSE,
+        'C': RED_CANNON,
+        'R': RED_ROOK,
+        'K': RED_KING,
+        'p': BLACK_PAWN,
+        'a': BLACK_ADVISOR,
+        'e': BLACK_ELEPHANT,
+        'h': BLACK_HORSE,
+        'c': BLACK_CANNON,
+        'r': BLACK_ROOK,
+        'k': BLACK_KING
+    }
+
+    // string representation for pieces
     const asciiPieces = ['.', 'P', 'A', 'E', 'H', 'C', 'R', 'K', 'p', 'a', 'e', 'h', 'c', 'r', 'k'];
 
+    function setBoard(fen) {
+        resetBoard();
+        let index = 0;
+
+        // parse board position
+        for (let rank = 0; rank < 14; rank++) {
+            for (let file = 0; file < 11; file++) {
+                let square = rank * 11 + file;
+
+                if (COORDINATES[square] != 'xx') {
+                    // parse pieces
+                    if ((fen[index].charCodeAt() >= 'a'.charCodeAt() && fen[index].charCodeAt() <= 'z'.charCodeAt()) ||
+                        (fen[index].charCodeAt() >= 'A'.charCodeAt() && fen[index].charCodeAt() <= 'Z'.charCodeAt())) {
+                            if (fen[index] == 'K') kingSquare[RED] = square;
+                            else if (fen[index] == 'k') kingSquare[BLACK] = square;
+
+                            board[square] = charPieces[fen[index]];
+                            index++;
+                    }
+
+                    // parse empty squares
+                    if (fen[index].charCodeAt() >= '0'.charCodeAt() && fen[index].charCodeAt() <= '9'.charCodeAt()) {
+                        let offset = fen[index] - '0';
+
+                        if (board[square] == EMPTY) file--;
+                        file += offset;
+                        index++;
+                    }
+
+                    if (fen[index] == '/') index++;
+                }
+            }
+        }
+
+        // parse side to move
+        index++;
+        side = (fen[index] == 'r') ? RED : BLACK;
+    }
+
+    // print board to console
     function printBoard() {
         let boardString = '';
 
@@ -133,7 +191,9 @@ var Engine = function() {
 
             if (rank < 13) boardString +=  '\n';
         }
-        boardString += '   a b c d e f g h i';
+        boardString += '   a b c d e f g h i\n\n';
+        boardString += '                   side: ' + (side == RED ? 'r' : 'b') + '\n';
+        boardString += '                   king squares: [' + COORDINATES[kingSquare[RED]] + ', ' + COORDINATES[kingSquare[BLACK]] + ']';
         console.log(boardString);
     }
 
@@ -145,18 +205,7 @@ var Engine = function() {
 
     // debug
     function debug() {
-        console.log(a9);
-        console.log(COORDINATES[a9]);
-
-        console.log(i0);
-        console.log(COORDINATES[i0]);
-
-        resetBoard();
-
-        board[a9] = BLACK_ROOK;
-        board[i9] = BLACK_ROOK;
-        board[a0] = RED_ROOK;
-        board[i0] = RED_ROOK;
+        setBoard(START_FEN);
 
         printBoard();
     }
