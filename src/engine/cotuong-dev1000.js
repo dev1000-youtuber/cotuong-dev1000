@@ -32,16 +32,16 @@ var Engine = function() {
     const OFFBOARD = 15;
 
     // square encoding
-    const a9 = 23, b9 = 24, c9 = 25, d9 = 26, e9 = 27, f9 = 28, g9 = 29, h9 = 30, i9 = 31;
-    const a8 = 34, b8 = 35, c8 = 36, d8 = 37, e8 = 38, f8 = 39, g8 = 40, h8 = 41, i8 = 42;
-    const a7 = 45, b7 = 46, c7 = 47, d7 = 48, e7 = 49, f7 = 50, g7 = 51, h7 = 52, i7 = 53;
-    const a6 = 56, b6 = 57, c6 = 58, d6 = 59, e6 = 60, f6 = 61, g6 = 62, h6 = 63, i6 = 64;
-    const a5 = 67, b5 = 68, c5 = 69, d5 = 70, e5 = 71, f5 = 72, g5 = 73, h5 = 74, i5 = 75;
-    const a4 = 78, b4 = 79, c4 = 80, d4 = 81, e4 = 82, f4 = 83, g4 = 84, h4 = 85, i4 = 86;
-    const a3 = 89, b3 = 90, c3 = 91, d3 = 92, e3 = 93, f3 = 94, g3 = 95, h3 = 96, i3 = 97;
-    const a2 = 100, b2 = 101, c2 = 102, d2 = 103, e2 = 104, f2 = 105, g2 = 106, h2 = 107, i2 = 108;
-    const a1 = 111, b1 = 112, c1 = 113, d1 = 114, e1 = 115, f1 = 116, g1 = 117, h1 = 118, i1 = 119;
-    const a0 = 122, b0 = 123, c0 = 124, d0 = 125, e0 = 126, f0 = 127, g0 = 128, h0 = 129, i0 = 130;
+    const A9 = 23, B9 = 24, C9 = 25, D9 = 26, E9 = 27, F9 = 28, G9 = 29, H9 = 30, I9 = 31;
+    const A8 = 34, B8 = 35, C8 = 36, D8 = 37, E8 = 38, F8 = 39, G8 = 40, H8 = 41, I8 = 42;
+    const A7 = 45, B7 = 46, C7 = 47, D7 = 48, E7 = 49, F7 = 50, G7 = 51, H7 = 52, I7 = 53;
+    const A6 = 56, B6 = 57, C6 = 58, D6 = 59, E6 = 60, F6 = 61, G6 = 62, H6 = 63, I6 = 64;
+    const A5 = 67, B5 = 68, C5 = 69, D5 = 70, E5 = 71, F5 = 72, G5 = 73, H5 = 74, I5 = 75;
+    const A4 = 78, B4 = 79, C4 = 80, D4 = 81, E4 = 82, F4 = 83, G4 = 84, H4 = 85, I4 = 86;
+    const A3 = 89, B3 = 90, C3 = 91, D3 = 92, E3 = 93, F3 = 94, G3 = 95, H3 = 96, I3 = 97;
+    const A2 = 100, B2 = 101, C2 = 102, D2 = 103, E2 = 104, F2 = 105, G2 = 106, H2 = 107, I2 = 108;
+    const A1 = 111, B1 = 112, C1 = 113, D1 = 114, E1 = 115, F1 = 116, G1 = 117, H1 = 118, I1 = 119;
+    const A0 = 122, B0 = 123, C0 = 124, D0 = 125, E0 = 126, F0 = 127, G0 = 128, H0 = 129, I0 = 130;
 
     // coordinates encoding
     const COORDINATES = [
@@ -115,7 +115,7 @@ var Engine = function() {
     }
 
     // encode string to pieces
-    const charPieces = {
+    const CHAR_TO_PIECE = {
         'P': RED_PAWN,
         'A': RED_ADVISOR,
         'E': RED_ELEPHANT,
@@ -133,7 +133,7 @@ var Engine = function() {
     }
 
     // string representation for pieces
-    const asciiPieces = ['.', 'P', 'A', 'E', 'H', 'C', 'R', 'K', 'p', 'a', 'e', 'h', 'c', 'r', 'k'];
+    const PIECE_TO_CHAR = ['.', 'P', 'A', 'E', 'H', 'C', 'R', 'K', 'p', 'a', 'e', 'h', 'c', 'r', 'k'];
 
     function setBoard(fen) {
         resetBoard();
@@ -151,7 +151,7 @@ var Engine = function() {
                             if (fen[index] == 'K') kingSquare[RED] = square;
                             else if (fen[index] == 'k') kingSquare[BLACK] = square;
 
-                            board[square] = charPieces[fen[index]];
+                            board[square] = CHAR_TO_PIECE[fen[index]];
                             index++;
                     }
 
@@ -185,8 +185,8 @@ var Engine = function() {
 
                 if (COORDINATES[square] != 'xx') {
                     if (file == 1) boardString += 11 - rank + '  ';
-                    boardString += asciiPieces[board[square]] + ' ';
-                };
+                    boardString += PIECE_TO_CHAR[board[square]] + ' ';
+                }
             }
 
             if (rank < 13) boardString +=  '\n';
@@ -194,6 +194,101 @@ var Engine = function() {
         boardString += '   a b c d e f g h i\n\n';
         boardString += '                   side: ' + (side == RED ? 'r' : 'b') + '\n';
         boardString += '                   king squares: [' + COORDINATES[kingSquare[RED]] + ', ' + COORDINATES[kingSquare[BLACK]] + ']';
+        console.log(boardString);
+    }
+
+    /*******************************************************\
+     *                                                     *
+     *                     ATTACKS SECTION                 *
+     *                                                     *
+    \*******************************************************/
+
+    // directions
+    const UP = -11;
+    const DOWN = +11;
+    const LEFT = -1;
+    const RIGHT = +1;
+
+    // piece move offsets
+    const ORTHOGONALS = [LEFT, RIGHT, UP, DOWN];
+    const DIAGONALS = [UP + LEFT, UP + RIGHT, DOWN + LEFT, DOWN + RIGHT];
+
+    // offsets to get attacks by pawns
+    const PAWN_ATTACK_OFFSETS = [
+        [DOWN, LEFT, RIGHT],
+        [UP, LEFT, RIGHT]
+    ]
+
+    // offsets to get attacks by horses
+    const HORSE_ATTACK_OFFSETS = [
+        [UP + UP + LEFT, LEFT + LEFT + UP],
+        [UP + UP + RIGHT, RIGHT + RIGHT + UP],
+        [DOWN + DOWN + LEFT, LEFT + LEFT + DOWN],
+        [DOWN + DOWN + RIGHT, RIGHT + RIGHT + DOWN]
+    ]
+
+    // is square attacked by a given side
+    function isSquareAttacked(square, color) {
+        //by pawns
+        for (let direction = 0; direction < PAWN_ATTACK_OFFSETS[color].length; direction++) {
+            let directionTarget = square + PAWN_ATTACK_OFFSETS[color][direction];
+
+            if (board[directionTarget] == ((color == RED) ? RED_PAWN : BLACK_PAWN)) return true;
+        }
+
+        // by horses
+        for (let direction = 0; direction < DIAGONALS.length; direction++) {
+            let directionTarget= square + DIAGONALS[direction];
+
+            if (board[directionTarget] == EMPTY) {
+                for (let offset = 0; offset < 2; offset++) {
+                    let horseTarget = square + HORSE_ATTACK_OFFSETS[direction][offset];
+
+                    if (board[horseTarget] == ((color == RED) ? RED_HORSE : BLACK_HORSE)) return true;
+                }
+            }
+        }
+
+        // by king, rooks and cannons
+        for (let direction = 0; direction < ORTHOGONALS.length; direction++) {
+            let directionTarget = square + ORTHOGONALS[direction];
+            let jumpOver = 0;
+
+            while (board[directionTarget] != OFFBOARD) {
+                if (jumpOver == 0) {
+                    if (board[directionTarget] == ((color == RED) ? RED_ROOK : BLACK_ROOK) ||
+                        board[directionTarget] == ((color == RED) ? RED_KING : BLACK_KING))
+                        return true;
+                }
+
+                if (board[directionTarget] != EMPTY) jumpOver++;
+                if (jumpOver == 2 && board[directionTarget] == ((color == RED) ? RED_CANNON : BLACK_CANNON)) return true;
+
+                directionTarget += ORTHOGONALS[direction];
+            }
+        }
+
+        return false;
+    }
+
+    // print attacks to console
+    function printAttacks(color) {
+        let boardString = '';
+
+        // print board position
+        for (let rank = 0; rank < 14; rank++) {
+            for (let file = 0; file < 11; file++) {
+                let square = rank * 11 + file;
+
+                if (COORDINATES[square] != 'xx') {
+                    if (file == 1) boardString += 11 - rank + '  ';
+                    boardString += isSquareAttacked(square, color) ? 'x ' : '. ';
+                }
+            }
+
+            if (rank < 13) boardString +=  '\n';
+        }
+        boardString += '   a b c d e f g h i\n\n';
         console.log(boardString);
     }
 
@@ -205,9 +300,18 @@ var Engine = function() {
 
     // debug
     function debug() {
-        setBoard(START_FEN);
+        // setBoard(START_FEN);
+        setBoard('9/9/9/9/9/9/9/9/9/9/9 r - - 0 1');
+
+        board[B2] = RED_CANNON;
+        board[B5] = BLACK_HORSE;
+        board[B4] = BLACK_CANNON;
+
+
 
         printBoard();
+
+        printAttacks(RED);
     }
 
     return {
