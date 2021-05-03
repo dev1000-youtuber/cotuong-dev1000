@@ -12,6 +12,7 @@ var Engine = function() {
     // side to move
     const RED = 0;
     const BLACK = 1;
+    const NO_COLOR = 2;
 
     // piece encoding
     const EMPTY = 0;
@@ -30,6 +31,30 @@ var Engine = function() {
     const BLACK_ROOK = 13;
     const BLACK_KING = 14;
     const OFFBOARD = 15;
+
+    // piece types
+    const PAWN = 16;
+    const ADVISOR = 17;
+    const ELEPHANT = 18;
+    const HORSE = 19;
+    const CANNON = 20;
+    const ROOK = 21;
+    const KING = 22;
+
+    // map types to piece
+    const PIECE_TYPE = [
+        0,
+        PAWN, ADVISOR, ELEPHANT, HORSE, CANNON, ROOK, KING,
+        PAWN, ADVISOR, ELEPHANT, HORSE, CANNON, ROOK, KING
+    ]
+
+    // map color to piece
+    const PIECE_COLOR = [
+        NO_COLOR,
+        RED, RED, RED, RED, RED, RED, RED,
+        BLACK, BLACK, BLACK, BLACK, BLACK, BLACK, BLACK
+    ]
+
 
     // square encoding
     const A9 = 23, B9 = 24, C9 = 25, D9 = 26, E9 = 27, F9 = 28, G9 = 29, H9 = 30, I9 = 31;
@@ -72,7 +97,7 @@ var Engine = function() {
         x x x x x x x x x x x
         x r h e a k a e h r x
         x . . . . . . . . . x
-        x . c . . . . c . . x
+        x . c . . . . . c . x
         x p . p . p . p . p x
         x . . . . . . . . . x
         x . . . . . . . . . x
@@ -227,6 +252,23 @@ var Engine = function() {
         [DOWN + DOWN + RIGHT, RIGHT + RIGHT + DOWN]
     ]
 
+    // offsets to get target squares for pawns
+    const PAWN_MOVE_OFFSETS = [
+        [UP, LEFT, RIGHT],
+        [DOWN, LEFT, RIGHT]
+    ]
+
+    // offsets to get target squares for horses
+    const HORSE_MOVE_OFFSETS = [
+        [LEFT + LEFT + UP, LEFT + LEFT + DOWN],
+        [RIGHT + RIGHT + UP, RIGHT + RIGHT + DOWN],
+        [UP + UP + LEFT, UP + UP + RIGHT],
+        [DOWN + DOWN + LEFT, DOWN + DOWN + RIGHT]
+    ]
+
+    // offsets to get target squares for elephants
+    const ELEPHANT_MOVE_OFFSETS = [(UP + LEFT) * 2, (UP + RIGHT) * 2, (DOWN + LEFT) * 2, (DOWN + RIGHT) * 2];
+
     // is square attacked by a given side
     function isSquareAttacked(square, color) {
         //by pawns
@@ -292,6 +334,152 @@ var Engine = function() {
         console.log(boardString);
     }
 
+     /*******************************************************\
+     *                                                     *
+     *                     MOVE GENERATOR SECTION          *
+     *                                                     *
+    \*******************************************************/
+
+    // zone of board
+    const BOARD_ZONES = [
+        [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
+            0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
+            0, 1, 1, 1, 2, 2, 2, 1, 1, 1, 0,
+            0, 1, 1, 1, 2, 2, 2, 1, 1, 1, 0,
+            0, 1, 1, 1, 2, 2, 2, 1, 1, 1, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ],
+        [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 1, 1, 1, 2, 2, 2, 1, 1, 1, 0,
+            0, 1, 1, 1, 2, 2, 2, 1, 1, 1, 0,
+            0, 1, 1, 1, 2, 2, 2, 1, 1, 1, 0,
+            0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
+            0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ]
+    ]
+
+    // push move
+    function pushMove(sourceSquare, targetSquare, sourcePiece, targetPiece) {
+        if (targetPiece == EMPTY || PIECE_COLOR[targetPiece] == side ^ 1) {
+            if (targetPiece)
+                console.log(COORDINATES[sourceSquare], COORDINATES[targetSquare], 'capture');
+            else
+                console.log(COORDINATES[sourceSquare], COORDINATES[targetSquare]);
+        }
+    }
+
+    // generate legal moves
+    function generateMoves() {
+        for (let sourceSquare = 0; sourceSquare < board.length; sourceSquare++) {
+            if (board[sourceSquare] != OFFBOARD) {
+                let piece = board[sourceSquare];
+                let pieceType = PIECE_TYPE[piece];
+                let pieceColor = PIECE_COLOR[piece];
+
+                if (pieceColor == side) {
+                    // pawns
+                    if (pieceType == PAWN) {
+                        for (let direction = 0; direction < PAWN_MOVE_OFFSETS[side].length; direction++) {
+                            let targetSquare = sourceSquare + PAWN_MOVE_OFFSETS[side][direction];
+                            let targetPiece = board[targetSquare];
+
+                            if (targetPiece != OFFBOARD) pushMove(sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                            if (BOARD_ZONES[side][sourceSquare]) break;
+                        }
+                    }
+
+                    // king & advisors
+                    if (pieceType == KING || pieceType == ADVISOR) {
+                        for (let direction = 0; direction < ORTHOGONALS.length; direction++) {
+                            let offsets = (pieceType == KING) ? ORTHOGONALS : DIAGONALS;
+                            let targetSquare = sourceSquare + offsets[direction];
+                            let targetPiece = board[targetSquare];
+
+                            if (BOARD_ZONES[side][targetSquare] == 2) pushMove(sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                        }
+                    }
+
+                    // elephants
+                    if (pieceType == ELEPHANT) {
+                        for (let direction = 0; direction < ELEPHANT_MOVE_OFFSETS.length; direction++) {
+                            let targetSquare = sourceSquare + ELEPHANT_MOVE_OFFSETS[direction];
+                            let jumpOver = sourceSquare + DIAGONALS[direction];
+                            let targetPiece = board[targetSquare];
+
+                            if (BOARD_ZONES[side][targetSquare] && board[jumpOver] == EMPTY) pushMove(sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                        }
+                    }
+
+                    // horses
+                    if (pieceType == HORSE) {
+                        for (let direction = 0; direction < ORTHOGONALS.length; direction++) {
+                            let targetDirection = sourceSquare + ORTHOGONALS[direction];
+
+                            if (board[targetDirection] == EMPTY) {
+                                for (let offset = 0; offset < 2; offset++) {
+                                    let targetSquare = sourceSquare + HORSE_MOVE_OFFSETS[direction][offset];
+                                    let targetPiece = board[targetSquare];
+
+                                    if (targetPiece != OFFBOARD) pushMove(sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                                }
+                            }
+                        }
+                    }
+
+                    // rooks & cannons
+                    if (pieceType == ROOK || pieceType == CANNON) {
+                        for (let direction = 0; direction < ORTHOGONALS.length; direction++) {
+                            let targetSquare = sourceSquare + ORTHOGONALS[direction];
+                            let jumpOver = 0;
+
+                            while (board[targetSquare] != OFFBOARD) {
+                                let targetPiece = board[targetSquare];
+
+                                if (jumpOver == 0) {
+                                    // all rook moves
+                                    if (pieceType == ROOK && PIECE_COLOR[targetPiece] == side ^ 1)
+                                        pushMove(sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+
+                                    // cannon normal moves
+                                    else if (pieceType == CANNON && targetPiece == EMPTY)
+                                        pushMove(sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+
+                                }
+
+                                if (targetPiece) jumpOver++;
+                                if (targetPiece && pieceType == CANNON && PIECE_COLOR[targetPiece] == side ^ 1 && jumpOver == 2) {
+                                    // capture cannon moves
+                                    pushMove(sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                                    break;
+                                }
+
+                                targetSquare += ORTHOGONALS[direction];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // init Game
     (function initAll() {
         console.log("Init all");
@@ -300,18 +488,13 @@ var Engine = function() {
 
     // debug
     function debug() {
-        // setBoard(START_FEN);
-        setBoard('9/9/9/9/9/9/9/9/9/9/9 r - - 0 1');
-
-        board[B2] = RED_CANNON;
-        board[B5] = BLACK_HORSE;
-        board[B4] = BLACK_CANNON;
-
+        setBoard(START_FEN);
+        // setBoard('2c6/9/9/9/9/9/9/2c6/9/2C6 r - - 0 1');
 
 
         printBoard();
 
-        printAttacks(RED);
+        generateMoves();
     }
 
     return {
