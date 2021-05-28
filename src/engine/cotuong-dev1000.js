@@ -121,6 +121,9 @@ var Engine = function() {
     // king position
     var kingSquare = [0, 0];
 
+    // move stack - store moves for entire game
+    var moveStack = [];
+
     // reset board array & game state
     function resetBoard() {
         // reset board position
@@ -137,6 +140,7 @@ var Engine = function() {
         side = RED;
         sixty = 0;
         kingSquare = [0, 0];
+        moveStack = [];
     }
 
     // encode string to pieces
@@ -220,6 +224,24 @@ var Engine = function() {
         boardString += '                   side: ' + (side == RED ? 'r' : 'b') + '\n';
         boardString += '                   king squares: [' + COORDINATES[kingSquare[RED]] + ', ' + COORDINATES[kingSquare[BLACK]] + ']';
         console.log(boardString);
+    }
+
+    // print moves
+    function printMoveList(moveList) {
+        let listMoves = '   Move  Piece  Captured  Flag  Score\n\n';
+
+        for (let index = 0; index < moveList.length; index++) {
+            let move = moveList[index].move;
+
+            listMoves += '   ' + COORDINATES[getSourceSquare(move)] + COORDINATES[getTargetSquare(move)] +
+                         '     ' + PIECE_TO_CHAR[getSourcePiece(move)] +
+                         '       ' + PIECE_TO_CHAR[getTargetPiece(move)] +
+                         '      ' + getCaptureFlag(move) +
+                         '      ' + moveList[index].score + '\n';
+        }
+
+        listMoves += '\n   Total moves: ' + moveList.length;
+        console.log(listMoves);
     }
 
     /*******************************************************\
@@ -334,7 +356,7 @@ var Engine = function() {
         console.log(boardString);
     }
 
-     /*******************************************************\
+    /*******************************************************\
      *                                                     *
      *                     MOVE GENERATOR SECTION          *
      *                                                     *
@@ -376,18 +398,62 @@ var Engine = function() {
         ]
     ]
 
-    // push move
-    function pushMove(sourceSquare, targetSquare, sourcePiece, targetPiece) {
+    /*
+                            MOVE ENCODING
+        0000 0000 0000 0000 0000 1111 1111   sourceSquare    0xFF
+        0000 0000 0000 1111 1111 0000 0000   targetSquare    0xFF00
+        0000 0000 1111 0000 0000 0000 0000   sourcePiece     0xFF0000
+        0000 1111 0000 0000 0000 0000 0000   targetPiece     0xFF00000
+        0001 0000 0000 0000 0000 0000 0000   captureFlag     0x1000000
+
+        EX: 0001 1111 1111 1111 1111 1000 0010
+        &
+            0000 0000 0000 0000 0000 1111 1111
+        =>  0000 0000 0000 0000 0000 1000 0010
+
+        0001 1111 1111 1111 1111 1000 0010 >> 8
+        = 0001 1111 1111 1000 0000
+        & 0000 0000 0000 1111 1111
+        =>0000 0000 0000 1000 0000
+    */
+
+    // store squares & pieces into a single number
+    function encodeMove(sourceSquare, targetSquare, sourcePiece, targetPiece, captureFlag) {
+        return (sourceSquare) |
+                (targetSquare << 8) |
+                (sourcePiece << 16) |
+                (targetPiece << 20) |
+                (captureFlag << 24);
+    }
+
+    function getSourceSquare(move) { return move & 0xFF }
+    function getTargetSquare(move) { return (move >> 8) & 0xFF }
+    function getSourcePiece(move) { return (move >> 16) & 0xF }
+    function getTargetPiece(move) { return (move >> 20) & 0xF }
+    function getCaptureFlag(move) { return (move >> 24) & 0x1 }
+
+
+    // push move into move list
+    function pushMove(moveList, sourceSquare, targetSquare, sourcePiece, targetPiece) {
         if (targetPiece == EMPTY || PIECE_COLOR[targetPiece] == side ^ 1) {
-            if (targetPiece)
-                console.log(COORDINATES[sourceSquare], COORDINATES[targetSquare], 'capture');
-            else
-                console.log(COORDINATES[sourceSquare], COORDINATES[targetSquare]);
+            let move = 0;
+
+            if (targetPiece) move = encodeMove(sourceSquare, targetSquare, sourcePiece, targetPiece, 1);
+            else move = encodeMove(sourceSquare, targetSquare, sourcePiece, targetPiece, 0);
+
+            let moveScore = 0;
+
+            moveList.push({
+                move: move,
+                score: moveScore
+            });
         }
     }
 
     // generate legal moves
     function generateMoves() {
+        let moveList = [];
+
         for (let sourceSquare = 0; sourceSquare < board.length; sourceSquare++) {
             if (board[sourceSquare] != OFFBOARD) {
                 let piece = board[sourceSquare];
@@ -401,7 +467,7 @@ var Engine = function() {
                             let targetSquare = sourceSquare + PAWN_MOVE_OFFSETS[side][direction];
                             let targetPiece = board[targetSquare];
 
-                            if (targetPiece != OFFBOARD) pushMove(sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                            if (targetPiece != OFFBOARD) pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece);
                             if (BOARD_ZONES[side][sourceSquare]) break;
                         }
                     }
@@ -413,7 +479,7 @@ var Engine = function() {
                             let targetSquare = sourceSquare + offsets[direction];
                             let targetPiece = board[targetSquare];
 
-                            if (BOARD_ZONES[side][targetSquare] == 2) pushMove(sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                            if (BOARD_ZONES[side][targetSquare] == 2) pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece);
                         }
                     }
 
@@ -424,7 +490,7 @@ var Engine = function() {
                             let jumpOver = sourceSquare + DIAGONALS[direction];
                             let targetPiece = board[targetSquare];
 
-                            if (BOARD_ZONES[side][targetSquare] && board[jumpOver] == EMPTY) pushMove(sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                            if (BOARD_ZONES[side][targetSquare] && board[jumpOver] == EMPTY) pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece);
                         }
                     }
 
@@ -438,7 +504,7 @@ var Engine = function() {
                                     let targetSquare = sourceSquare + HORSE_MOVE_OFFSETS[direction][offset];
                                     let targetPiece = board[targetSquare];
 
-                                    if (targetPiece != OFFBOARD) pushMove(sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                                    if (targetPiece != OFFBOARD) pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece);
                                 }
                             }
                         }
@@ -456,18 +522,18 @@ var Engine = function() {
                                 if (jumpOver == 0) {
                                     // all rook moves
                                     if (pieceType == ROOK && PIECE_COLOR[targetPiece] == side ^ 1)
-                                        pushMove(sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                                        pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece);
 
                                     // cannon normal moves
                                     else if (pieceType == CANNON && targetPiece == EMPTY)
-                                        pushMove(sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                                        pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece);
 
                                 }
 
                                 if (targetPiece) jumpOver++;
                                 if (targetPiece && pieceType == CANNON && PIECE_COLOR[targetPiece] == side ^ 1 && jumpOver == 2) {
                                     // capture cannon moves
-                                    pushMove(sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                                    pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece);
                                     break;
                                 }
 
@@ -478,7 +544,84 @@ var Engine = function() {
                 }
             }
         }
+
+        return moveList;
     }
+
+    /*******************************************************\
+     *                                                     *
+     *                     MAKE MOVE / TACK BACK           *
+     *                                                     *
+    \*******************************************************/
+
+    // Make move on the board
+    function makeMove(move) {
+        // store board state into moveStack
+        moveStack.push({
+            move: move,
+            side: side,
+            sixty: sixty
+        });
+
+        let sourceSquare = getSourceSquare(move);
+        let targetSquare = getTargetSquare(move);
+        let sourcePiece = getSourcePiece(move);
+        let targetPiece = getTargetPiece(move);
+        let captureFlag = getCaptureFlag(move);
+
+        // move piece
+        board[targetSquare] = sourcePiece;
+        board[sourceSquare] = EMPTY;
+
+        if (captureFlag) sixty = 0;
+        else sixty++;
+
+        // update king square
+        if (board[targetSquare] == RED_KING || board[targetSquare] == BLACK_KING)
+            kingSquare[side] = targetSquare;
+
+        // switch side to move
+        side ^= 1;
+
+        // return illegal move if king is left in check
+        if (isSquareAttacked(kingSquare[side ^ 1], side)) {
+            takeBack();
+            return false;
+        } else return true;
+    }
+
+    // take back
+    function takeBack() {
+        // decode move
+        let moveIndex = moveStack.length - 1; // get latest move index
+        let move = moveStack[moveIndex].move;
+
+        let sourceSquare = getSourceSquare(move);
+        let targetSquare = getTargetSquare(move);
+        let sourcePiece = getSourcePiece(move);
+        let targetPiece = getTargetPiece(move);
+        let captureFlag = getCaptureFlag(move);
+
+        // move piece back
+        board[sourceSquare] = sourcePiece;
+        board[targetSquare] = EMPTY;
+
+        // restore captured piece
+        if (captureFlag) {
+            board[targetSquare] = targetPiece;
+        }
+
+        // update king square
+        if (board[sourceSquare] == RED_KING || board[sourceSquare] == BLACK_KING)
+            kingSquare[side ^ 1] = sourceSquare;
+
+        side = moveStack[moveIndex].side;
+        sixty = moveStack[moveIndex].sixty;
+
+        // remove move from moveStack
+        moveStack.pop();
+    }
+
 
     // init Game
     (function initAll() {
@@ -489,12 +632,14 @@ var Engine = function() {
     // debug
     function debug() {
         setBoard(START_FEN);
-        // setBoard('2c6/9/9/9/9/9/9/2c6/9/2C6 r - - 0 1');
-
-
         printBoard();
 
-        generateMoves();
+        let moves = generateMoves();
+        makeMove(moves[0].move);
+        printBoard();
+
+        takeBack();
+        printBoard();
     }
 
     return {
