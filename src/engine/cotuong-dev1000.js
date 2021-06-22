@@ -622,6 +622,64 @@ var Engine = function() {
         moveStack.pop();
     }
 
+    /*
+                        Perft Results
+        rheakaehr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RHEAKAEHR r - - 0 1
+        depth           nodes          checks           captures
+            1              44               0                  2
+            2           1,920               6                 72
+            3          79,666             384              3,159
+            4       3,290,240          19,380            115,365
+            5     133,312,995         953,251          4,917,734
+    */
+
+    // perft driver
+    function perftDriver(depth) {
+        if (depth == 0) { nodes++; return; }
+
+        let moveList = generateMoves();
+
+        for (let count = 0; count < moveList.length; count++) {
+            if (!makeMove(moveList[count].move)) continue;
+
+            perftDriver(depth - 1);
+            takeBack();
+        }
+    }
+
+    // perft test
+    function perftTest(depth) {
+        nodes = 0;
+        console.log('   Performance Test:\n');
+        let resultString = '';
+        let startTime = Date.now();
+
+        let moveList = generateMoves();
+
+        for (let count = 0; count < moveList.length; count++) {
+            if (!makeMove(moveList[count].move)) continue;
+
+            let cumNodes = nodes;
+            perftDriver(depth - 1);
+            takeBack();
+            let oldNodes = nodes - cumNodes;
+            console.log('   move' +
+                        ' ' + (count + 1) + ((count < 9) ? ':    ' : ':   ') +
+                        COORDINATES[getSourceSquare(moveList[count].move)] +
+                        COORDINATES[getTargetSquare(moveList[count].move)] +
+                        '    nodes: ' + oldNodes);
+
+        }
+
+        resultString += '\n   Depth: ' + depth;
+        resultString += '\n   Nodes: ' + nodes;
+        resultString += '\n    Time: ' + (Date.now() - startTime) + 'ms\n';
+        console.log(resultString);
+    }
+
+    // visited nodes count
+    var nodes = 0;
+
 
     // init Game
     (function initAll() {
@@ -631,15 +689,17 @@ var Engine = function() {
 
     // debug
     function debug() {
-        setBoard(START_FEN);
+        // setBoard(START_FEN);
+        setBoard('CRH1k1e2/3ca4/4ea3/9/2hr5/9/9/4E4/4A4/4KA3 r - - 0 1')
         printBoard();
 
-        let moves = generateMoves();
-        makeMove(moves[0].move);
-        printBoard();
+        // let moves = generateMoves();
+        // makeMove(moves[0].move);
+        // printBoard();
 
-        takeBack();
-        printBoard();
+        // takeBack();
+        // printBoard();
+        perftTest(5);
     }
 
     return {
