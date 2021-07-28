@@ -118,6 +118,9 @@ var Engine = function() {
     // sixty moves draw rule
     var sixty = 0;
 
+    // almost unique position identifier
+    var hashKey = 0;
+
     // king position
     var kingSquare = [0, 0];
 
@@ -141,6 +144,63 @@ var Engine = function() {
         sixty = 0;
         kingSquare = [0, 0];
         moveStack = [];
+        hashKey = 0;
+    }
+
+    /*******************************************************\
+     *                                                     *
+     *               RANDOM NUMBER GENERATOR               *
+     *                                                     *
+    \*******************************************************/
+
+    // fixed random seed
+    var randomState = 1804289383;
+
+    // generate 32-bit random numbers
+    function random() {
+        let number = randomState;
+
+        // 32-bit XOR shift
+        number ^= number << 13;
+        number ^= number >> 17;
+        number ^= number << 5;
+
+        randomState = number;
+
+        return number;
+    }
+
+    /*******************************************************\
+     *                                                     *
+     *               ZOBRIST KEYS                          *
+     *                                                     *
+    \*******************************************************/
+
+    // random keys
+    var pieceKeys = new Array(15 * 154);
+    var sideKey;
+
+    // init random hash keys
+    function initRandomKeys() {
+        for (let index = 0; index < pieceKeys.length; index++) pieceKeys[index] = random();
+        sideKey = random();
+    }
+
+    // generate hash key
+    function generateHashKey() {
+        let finalKey = 0;
+
+        // hash board position
+        for (let square = 0; square < board.length; square++) {
+            if (board[square] != OFFBOARD) {
+                let piece = board[square];
+                if (piece != EMPTY) finalKey ^= pieceKeys[(piece * board.length) + square];
+            }
+        }
+
+        // hash board state variables
+        if (side == RED) finalKey ^= sideKey;
+        return finalKey;
     }
 
     // encode string to pieces
@@ -173,7 +233,7 @@ var Engine = function() {
             for (let file = 0; file < 11; file++) {
                 let square = rank * 11 + file;
 
-                if (COORDINATES[square] != 'xx') {
+                if (board[square] != OFFBOARD) {
                     // parse pieces
                     if ((fen[index].charCodeAt() >= 'a'.charCodeAt() && fen[index].charCodeAt() <= 'z'.charCodeAt()) ||
                         (fen[index].charCodeAt() >= 'A'.charCodeAt() && fen[index].charCodeAt() <= 'Z'.charCodeAt())) {
@@ -201,6 +261,9 @@ var Engine = function() {
         // parse side to move
         index++;
         side = (fen[index] == 'r') ? RED : BLACK;
+
+        // generate hash key
+        hashKey = generateHashKey();
     }
 
     // print board to console
@@ -212,7 +275,7 @@ var Engine = function() {
             for (let file = 0; file < 11; file++) {
                 let square = rank * 11 + file;
 
-                if (COORDINATES[square] != 'xx') {
+                if (board[square] != OFFBOARD) {
                     if (file == 1) boardString += 11 - rank + '  ';
                     boardString += PIECE_TO_CHAR[board[square]] + ' ';
                 }
@@ -222,6 +285,7 @@ var Engine = function() {
         }
         boardString += '   a b c d e f g h i\n\n';
         boardString += '                   side: ' + (side == RED ? 'r' : 'b') + '\n';
+        boardString += '                   hashKey: ' + hashKey + '\n';
         boardString += '                   king squares: [' + COORDINATES[kingSquare[RED]] + ', ' + COORDINATES[kingSquare[BLACK]] + ']';
         console.log(boardString);
     }
@@ -344,7 +408,7 @@ var Engine = function() {
             for (let file = 0; file < 11; file++) {
                 let square = rank * 11 + file;
 
-                if (COORDINATES[square] != 'xx') {
+                if (board[square] != OFFBOARD) {
                     if (file == 1) boardString += 11 - rank + '  ';
                     boardString += isSquareAttacked(square, color) ? 'x ' : '. ';
                 }
@@ -559,7 +623,7 @@ var Engine = function() {
         // store board state into moveStack
         moveStack.push({
             move: move,
-            side: side,
+            hashKey: hashKey,
             sixty: sixty
         });
 
@@ -573,7 +637,14 @@ var Engine = function() {
         board[targetSquare] = sourcePiece;
         board[sourceSquare] = EMPTY;
 
-        if (captureFlag) sixty = 0;
+        // hash piece
+        hashKey ^= pieceKeys[sourcePiece * board.length + sourceSquare];
+        hashKey ^= pieceKeys[sourcePiece * board.length + targetSquare];
+
+        if (captureFlag) {
+            sixty = 0;
+            hashKey ^= pieceKeys[targetPiece * board.length + targetSquare];
+        }
         else sixty++;
 
         // update king square
@@ -582,6 +653,7 @@ var Engine = function() {
 
         // switch side to move
         side ^= 1;
+        hashKey ^= sideKey;
 
         // return illegal move if king is left in check
         if (isSquareAttacked(kingSquare[side ^ 1], side)) {
@@ -615,8 +687,11 @@ var Engine = function() {
         if (board[sourceSquare] == RED_KING || board[sourceSquare] == BLACK_KING)
             kingSquare[side ^ 1] = sourceSquare;
 
-        side = moveStack[moveIndex].side;
+        // switch side to move
+        side ^= 1;
+
         sixty = moveStack[moveIndex].sixty;
+        hashKey = moveStack[moveIndex].hashKey;
 
         // remove move from moveStack
         moveStack.pop();
@@ -684,22 +759,18 @@ var Engine = function() {
     // init Game
     (function initAll() {
         console.log("Init all");
+
+        initRandomKeys();
     }());
 
 
     // debug
     function debug() {
-        // setBoard(START_FEN);
-        setBoard('CRH1k1e2/3ca4/4ea3/9/2hr5/9/9/4E4/4A4/4KA3 r - - 0 1')
+        setBoard(START_FEN);
+        // setBoard('CRH1k1e2/3ca4/4ea3/9/2hr5/9/9/4E4/4A4/4KA3 r - - 0 1')
         printBoard();
 
-        // let moves = generateMoves();
-        // makeMove(moves[0].move);
-        // printBoard();
-
-        // takeBack();
-        // printBoard();
-        perftTest(5);
+        // perftDriver(1);
     }
 
     return {
