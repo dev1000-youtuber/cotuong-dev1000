@@ -498,24 +498,29 @@ var Engine = function() {
 
 
     // push move into move list
-    function pushMove(moveList, sourceSquare, targetSquare, sourcePiece, targetPiece) {
+    function pushMove(moveList, sourceSquare, targetSquare, sourcePiece, targetPiece, onlyCaptures) {
         if (targetPiece == EMPTY || PIECE_COLOR[targetPiece] == side ^ 1) {
             let move = 0;
 
             if (targetPiece) move = encodeMove(sourceSquare, targetSquare, sourcePiece, targetPiece, 1);
-            else move = encodeMove(sourceSquare, targetSquare, sourcePiece, targetPiece, 0);
+            else {
+                if (onlyCaptures == 0)
+                    move = encodeMove(sourceSquare, targetSquare, sourcePiece, targetPiece, 0);
+            }
 
             let moveScore = 0;
 
-            moveList.push({
-                move: move,
-                score: moveScore
-            });
+            if (move) {
+                moveList.push({
+                    move: move,
+                    score: moveScore
+                });
+            }
         }
     }
 
     // generate legal moves
-    function generateMoves() {
+    function generateMoves(onlyCaptures) {
         let moveList = [];
 
         for (let sourceSquare = 0; sourceSquare < board.length; sourceSquare++) {
@@ -531,7 +536,7 @@ var Engine = function() {
                             let targetSquare = sourceSquare + PAWN_MOVE_OFFSETS[side][direction];
                             let targetPiece = board[targetSquare];
 
-                            if (targetPiece != OFFBOARD) pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                            if (targetPiece != OFFBOARD) pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece, onlyCaptures);
                             if (BOARD_ZONES[side][sourceSquare]) break;
                         }
                     }
@@ -543,7 +548,7 @@ var Engine = function() {
                             let targetSquare = sourceSquare + offsets[direction];
                             let targetPiece = board[targetSquare];
 
-                            if (BOARD_ZONES[side][targetSquare] == 2) pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                            if (BOARD_ZONES[side][targetSquare] == 2) pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece, onlyCaptures);
                         }
                     }
 
@@ -554,7 +559,7 @@ var Engine = function() {
                             let jumpOver = sourceSquare + DIAGONALS[direction];
                             let targetPiece = board[targetSquare];
 
-                            if (BOARD_ZONES[side][targetSquare] && board[jumpOver] == EMPTY) pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                            if (BOARD_ZONES[side][targetSquare] && board[jumpOver] == EMPTY) pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece, onlyCaptures);
                         }
                     }
 
@@ -568,7 +573,7 @@ var Engine = function() {
                                     let targetSquare = sourceSquare + HORSE_MOVE_OFFSETS[direction][offset];
                                     let targetPiece = board[targetSquare];
 
-                                    if (targetPiece != OFFBOARD) pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                                    if (targetPiece != OFFBOARD) pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece, onlyCaptures);
                                 }
                             }
                         }
@@ -586,18 +591,18 @@ var Engine = function() {
                                 if (jumpOver == 0) {
                                     // all rook moves
                                     if (pieceType == ROOK && PIECE_COLOR[targetPiece] == side ^ 1)
-                                        pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                                        pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece, onlyCaptures);
 
                                     // cannon normal moves
                                     else if (pieceType == CANNON && targetPiece == EMPTY)
-                                        pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                                        pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece, onlyCaptures);
 
                                 }
 
                                 if (targetPiece) jumpOver++;
                                 if (targetPiece && pieceType == CANNON && PIECE_COLOR[targetPiece] == side ^ 1 && jumpOver == 2) {
                                     // capture cannon moves
-                                    pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece);
+                                    pushMove(moveList, sourceSquare, targetSquare, board[sourceSquare], targetPiece, onlyCaptures);
                                     break;
                                 }
 
@@ -712,7 +717,7 @@ var Engine = function() {
     function perftDriver(depth) {
         if (depth == 0) { nodes++; return; }
 
-        let moveList = generateMoves();
+        let moveList = generateMoves(ALL_MOVES);
 
         for (let count = 0; count < moveList.length; count++) {
             if (!makeMove(moveList[count].move)) continue;
@@ -729,7 +734,7 @@ var Engine = function() {
         let resultString = '';
         let startTime = Date.now();
 
-        let moveList = generateMoves();
+        let moveList = generateMoves(ALL_MOVES);
 
         for (let count = 0; count < moveList.length; count++) {
             if (!makeMove(moveList[count].move)) continue;
@@ -894,10 +899,127 @@ var Engine = function() {
         return (side == RED) ? score : -score;
     }
 
+     /*******************************************************\
+     *                                                     *
+     *                    SEARCH (AI)                      *
+     *                                                     *
+    \*******************************************************/
 
     // visited nodes count
     var nodes = 0;
 
+    // search constant
+    const INFINITY = 50000;
+    const ALL_MOVES = 0;
+    const ONLY_CAPTURES = 1;
+
+    // best move
+    var bestMove = 0;
+
+    // quiescene search
+    function quiescene(alpha, beta) {
+        // evaluate position
+        let evaluation = evaluate();
+
+        if (evaluation >= beta) {
+            return beta; // pruning
+        }
+
+        // found a better move
+        if (evaluation > alpha) {
+            alpha = evaluation;
+        }
+
+        let score = 0;
+
+        // create move list
+        let moveList = generateMoves(ONLY_CAPTURES);
+
+        // loop over moves within a moveList
+        for (let count = 0; count < moveList.length; count++) {
+            // make sure to make only legal moves
+            let move = moveList[count].move;
+            if (!makeMove(move)) continue;
+
+            // score current move
+            score = -quiescene(-beta, -alpha);
+
+            // take back move
+            takeBack();
+
+            if (score >= beta) {
+                return beta; // pruning
+            }
+
+            // found a better move
+            if (score > alpha) {
+                alpha = score;
+            }
+        }
+
+        return alpha;
+    }
+
+    // negamax alpha beta search
+    function negamax(alpha, beta, depth) {
+        let score = 0;
+
+        if (depth == 0)
+            return quiescene(alpha, beta);
+
+        // best move so far
+        let bestSoFar = 0;
+
+        // create move list
+        let moveList = generateMoves(ALL_MOVES);
+
+        // loop over moves within a moveList
+        for (let count = 0; count < moveList.length; count++) {
+            // make sure to make only legal moves
+            let move = moveList[count].move;
+            if (!makeMove(move)) continue;
+
+            // score current move
+            score = -negamax(-beta, -alpha, depth - 1);
+
+            // take back move
+            takeBack();
+
+            if (score >= beta) {
+                return beta; // pruning
+            }
+
+            // found a better move
+            if (score > alpha) {
+                alpha = score;
+
+                // associate best move with best score
+                bestSoFar = moveList[count].move;
+            }
+        }
+
+        // initialize best move
+        bestMove = bestSoFar;
+
+        return alpha
+    }
+
+    // search position for the best move
+    function searchPosition(depth) {
+        let score = 0;
+
+        // find best move within a given position
+        score = negamax(-INFINITY, INFINITY, depth);
+
+        console.log('bestmove ' + moveToString(bestMove));
+        console.log('score ' + score);
+    }
+
+    // print move
+    function moveToString(move) {
+        return COORDINATES[getSourceSquare(move)] +
+                COORDINATES[getTargetSquare(move)];
+    }
 
     // init Game
     (function initAll() {
@@ -913,11 +1035,13 @@ var Engine = function() {
         // setBoard('CRH1k1e2/3ca4/4ea3/9/2hr5/9/9/4E4/4A4/4KA3 r - - 0 1')
         printBoard();
 
-        board[H2] = EMPTY;
-        board[C2] = RED_CANNON;
-        printBoard();
+        searchPosition(2);
 
-        console.log(evaluate());
+        // board[H2] = EMPTY;
+        // board[C2] = RED_CANNON;
+        // printBoard();
+
+        // console.log(evaluate());
     }
 
     return {
